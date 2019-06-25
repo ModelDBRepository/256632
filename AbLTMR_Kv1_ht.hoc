@@ -1,0 +1,97 @@
+objref gbarscale
+gbarscale = new Vector()
+gbarscale = gbarscale.indgen(0,0.01,0.0005)
+
+// This chunk is to create two point processes.
+// run once
+objectvar stim
+stim = new IClamp(0.5)
+stim.del=100
+stim.dur=500
+tstop=700
+
+objref apc
+apc = new APCount(0.5)
+apc.thresh = -20
+//
+
+objref rect, recv, recn, threshxt,reci,recscale,reclat
+objref peakv, antipeakv, peakdiff, apamp
+recn = new Vector()
+reci = new Vector()
+recscale = new Vector()
+reclat = new Vector()
+
+for j = 0, 20{
+gkbar_kv1 = gbarscale.x[j]
+
+ for i = 0, 50 {
+  stim.amp = 0.03*i
+
+//this chunk is to initiate vectors as empty because append was used in the loop
+  rect = new Vector()
+  recv = new Vector()
+  threshxt= new Vector()
+  peakv = new Vector()
+  antipeakv = new Vector()
+  peakdiff = new Vector()
+  apamp = new Vector()
+ 
+  posl = 0 
+  posr=0
+//
+  rect.record(&t)
+  recv.record(&soma.v(0.5))
+  apc.record(threshxt)
+  run()
+ 
+  if (apc.n >=2){
+   for k = 0, threshxt.size()-2{
+    posl = rect.indwhere("==", threshxt.x[k])
+    posr = rect.indwhere("==", threshxt.x[k+1])
+    peakv.append(recv.max(posl, posr))
+    antipeakv.append(recv.min(posl,posr))}
+ 
+    k = threshxt.size()-1 
+    posl = rect.indwhere("==", threshxt.x[k])
+    posr = rect.indwhere("==",600)
+    peakv.append(recv.max(posl, posr))
+    antipeakv.append(recv.min(posl,posr))
+ 
+    peakdiff = peakv.c.sub(antipeakv)
+    apamp.where(peakdiff,">=",30)
+    recn.append(apamp.size())
+    reclat.append(rect.x[recv.indwhere("==",peakv.x[0])]) 
+  }else if (apc.n==1){
+   posl = rect.indwhere("==", threshxt.x[0])
+   posr = rect.indwhere("==",600)
+   peakv.append(recv.max(posl, posr))
+   antipeakv.append(recv.min(posl,posr))
+   peakdiff = peakv.c.sub(antipeakv)
+   apamp.where(peakdiff,">=",30)
+   recn.append(apamp.size())
+   reclat.append(rect.x[recv.indwhere("==",peakv.x[0])])  
+  } else {
+   recn.append(0)
+   reclat.append(600)
+  }
+ reci.append(stim.amp)
+ recscale.append(gkbar_kv1)
+ }
+}
+
+objref savdata
+savdata = new File()
+savdata.wopen("kv1_20190516_1n.dat")
+
+savdata.printf("reci recn reclat recscale\n")
+
+objref tempmatrix
+tempmatrix = new Matrix()
+tempmatrix.resize(recn.size(),4)
+tempmatrix.setcol(0, reci)
+tempmatrix.setcol(1, recn)
+tempmatrix.setcol(2, reclat)
+tempmatrix.setcol(3, recscale)
+tempmatrix.fprint(savdata, " %g")
+savdata.close()
